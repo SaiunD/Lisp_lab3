@@ -24,64 +24,52 @@
 
 ## Лістинг функції з використанням конструктивного підходу
 ```lisp
-CL-USER> (defun left-to-right (lst k count &optional (first nil) (result nil))
-           "Сортування бульбашкою зліва направо частини списку"
+CL-USER>  (defun left-to-right (lst k L R &optional (first nil) (result nil) (count 0))
+           "Сортування бульбашкою зліва направо"
            (cond
-             ((null lst) (values (append result (list first)) k)) ; повертаємо результат, якщо список закінчився
+             ((= count (1+ R)) (left-to-right lst k L R first (append result (list first)) (1+ count)))
+             ((null lst) (values result k)) ; повертаємо результат, якщо список закінчився
+             ((< count L) (left-to-right (cdr lst) k L R first (append result (list (car lst))) (1+ count)))
+             ((> count R) (left-to-right nil k L R first (append result lst) (1+ count)))
              ((null first)              ; визначаємо перший елемент
-              (left-to-right (cdr lst) k (1+ count) (car lst) result))
+              (left-to-right (cdr lst) k L R (car lst) result (1+ count)))
                                         ; логіка алгоритму
              ((> first (car lst)) 
-              (left-to-right (cdr lst) (1- count) (1+ count) first (append result (list (car lst)))))
+              (left-to-right (cdr lst) (1- count) L R first (append result (list (car lst))) (1+ count)))
              (t 
-              (left-to-right (cdr lst) k (1+ count) (car lst) (append result (list first))))))
+              (left-to-right (cdr lst) k L R (car lst) (append result (list first)) (1+ count)))))
 LEFT-TO-RIGHT
-CL-USER> (defun right-to-left (lst k count &optional (last nil) (result nil))
-           "Сортування бульбашкою cправа наліво частини списку"
+CL-USER> (defun right-to-left (lst k L R &optional (last nil) (result nil) (count (1- (length lst))))
+           "Сортування бульбашкою справа наліво"
            (cond
-             ((null lst) (values (append (list last) result) k)) ; повертаємо результат, якщо список закінчився
+             ((= count (1- L)) (if last
+                                   (right-to-left lst k L R nil (append (list last) result) (1- count))
+                                   (right-to-left lst k L R nil result (1- count))))
+             ((null lst) (values result k)) ; повертаємо результат, якщо список закінчився
+             ((> count R) (right-to-left (butlast lst) k L R last (append (last lst) result) (1- count)))
+             ((< count L) (right-to-left nil k L R nil (append lst result) (1- count)))
              ((null last)               ; визначаємо останній елемент
-              (right-to-left (butlast lst) k (1- count) (car (last lst)) result))
+              (right-to-left (butlast lst) k L R (car (last lst)) result (1- count)))
                                         ; логіка алгоритму
              ((< last (car (last lst)))
-              (right-to-left (butlast lst) count (1- count) last (append (last lst) result)))
+              (right-to-left (butlast lst) count L R last (append (list (car (last lst))) result) (1- count)))
              (t 
-              (right-to-left (butlast lst) k (1- count) (car (last lst)) (append (list last) result)))))
+              (right-to-left (butlast lst) k L R (car (last lst)) (append (list last) result) (1- count)))))
 RIGHT-TO-LEFT
-CL-USER> (defun left-side (lst L &optional (res nil) (count 0))
-           "Створює ліву частину списку до границі L, яка вже відсортована"
-           (if (> L count)
-               (left-side (cdr lst) L (append res (list (car lst))) (1+ count))
-               res))
-LEFT-SIDE
-CL-USER> (defun right-side (lst R &optional (res nil) (count (1- (length lst))))
-           "Створює праву частину списку від гранці R до кінця списку, яка вже відсортована"
-           (if (< R count)
-               (right-side (butlast lst) R (append (last lst) res) (1- count))
-               res))
-RIGHT-SIDE
 CL-USER> (defun shaker-sort-inner (lst L R k)
            "Реалізація сортування"
                                         ; перший цикл
-           (multiple-value-bind (res k) (left-to-right (subseq lst L (+ 1 R)) k L)
-             (let* ((left (left-side lst L))
-                    (right (right-side lst R))
-                    (input (if (null (car res))
-                               (append left right)  
-                               (append left res right))))
-               (setq R k)
+           (multiple-value-bind (res k) (left-to-right lst k L R)
+             (setq R k)
                                         ; другий цикл
-               (multiple-value-bind (res k) (right-to-left (subseq input L (+ 1 R)) k R)
-                 (let* ((left (left-side input L))
-                        (right (right-side input R))               
-                        (input (if (null (car res))
-                                   (append left right)  
-                                   (append left res right))))          
+             (if (< L R)
+                 (multiple-value-bind (res k) (right-to-left res k L R)
                    (setq L (1+ k))
-                   ;; перевіряємо умову для рекурсії
+                                        ; перевіряємо умову для рекурсії
                    (if (< L R)
-                       (shaker-sort-inner input L R k)
-                       input))))))
+                       (shaker-sort-inner res L R k)
+                       res))
+                 res)))
 SHAKER-SORT-INNER
 CL-USER> (defun shaker-sort (lst)
            (if lst
