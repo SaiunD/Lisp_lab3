@@ -1,54 +1,33 @@
-(defun left-to-right (lst k L R &optional (first nil) (result nil) (count 0))
-  "Сортування бульбашкою зліва направо"
-  (cond
-    ((= count (1+ R)) (left-to-right lst k L R first (append result (list first)) (1+ count)))
-    ((null lst) (values result k)) ; повертаємо результат, якщо список закінчився
-    ((< count L) (left-to-right (cdr lst) k L R first (append result (list (car lst))) (1+ count)))
-    ((> count R) (left-to-right nil k L R first (append result lst) (1+ count)))
-    ((null first)                       ; визначаємо перший елемент
-     (left-to-right (cdr lst) k L R (car lst) result (1+ count)))
-                                        ; логіка алгоритму
-    ((> first (car lst)) 
-     (left-to-right (cdr lst) (1- count) L R first (append result (list (car lst))) (1+ count)))
-    (t 
-     (left-to-right (cdr lst) k L R (car lst) (append result (list first)) (1+ count)))))
+(defun recur (c lst res1 i k L R)
+  (if lst
+      (let* ((cond1 (< i L))
+             (cond2 (< c (car lst)))
+             (new-c (if (or cond1 cond2) (car lst) c))
+             (new-put (if (or cond1 cond2) c (car lst)))
+             (new-k (if (or cond1 cond2) k i)))
+        (multiple-value-bind (znach acc bind-k bind-R) (recur new-c (cdr lst) (cons new-put res1) (1+ i) new-k L R)
+          (if res1
+              (let* ((cond3 (<= (car res1) znach))
+                     (cond4 (> i R))
+                     (new-znach (if (or cond3 cond4) (car res1) znach))
+                     (new-acc-put (if (or cond3 cond4) znach (car res1)))
+                     (new-k-r (if cond3 bind-k (1- i))))
+                (values new-znach (cons new-acc-put acc) new-k-r bind-R))
+              (values nil (cons znach acc) bind-k bind-R)))
+        )
+      (let* ((cond5 (> c (car res1)))
+             (new-z (if cond5 (car res1) c))
+             (new-acc-p (if cond5 c (car res1))))
+        (values new-z (list new-acc-p) k k))))
 
-(defun right-to-left (lst k L R &optional (last nil) (result nil) (count (1- (length lst))))
-  "Сортування бульбашкою справа наліво"
-  (cond
-    ((= count (1- L)) (if last
-                          (right-to-left lst k L R nil (append (list last) result) (1- count))
-                          (right-to-left lst k L R nil result (1- count))))
-    ((null lst) (values result k)) ; повертаємо результат, якщо список закінчився
-    ((> count R) (right-to-left (butlast lst) k L R last (append (last lst) result) (1- count)))
-    ((< count L) (right-to-left nil k L R nil (append lst result) (1- count)))
-    ((null last)                        ; визначаємо останній елемент
-     (right-to-left (butlast lst) k L R (car (last lst)) result (1- count)))
-                                        ; логіка алгоритму
-    ((< last (car (last lst)))
-     (right-to-left (butlast lst) count L R last (append (list (car (last lst))) result) (1- count)))
-    (t 
-     (right-to-left (butlast lst) k L R (car (last lst)) (append (list last) result) (1- count)))))
-
-(defun shaker-sort-inner (lst L R k)
-  "Реалізація сортування"
-                                        ; перший цикл
-  (multiple-value-bind (res k) (left-to-right lst k L R)
-    (setq R k)
-                                        ; другий цикл
-    (if (< L R)
-        (multiple-value-bind (res k) (right-to-left res k L R)
-          (setq L (1+ k))
-          ; перевіряємо умову для рекурсії
-          (if (< L R)
-              (shaker-sort-inner res L R k)
-              res))
-        res)))
+ (defun shaker-sort-inner (lst k L R)
+           (if (< L R)
+               (multiple-value-bind (z new-lst new-k new-R) (recur (car lst) (cdr lst) nil 0 k L R)
+                 (shaker-sort-inner new-lst new-k (1+ new-k) new-R))
+               lst))
 
 (defun shaker-sort (lst)
-  (if lst
-      (shaker-sort-inner lst 0 (1- (length lst)) 0)
-      lst))
+  (shaker-sort-inner lst 0 0 (1- (length lst))))
 
 (defun check-shaker-sort (name input-lst expected) 
   "Execute `shaker-sort' on `input', compare result with `expected' and print comparison status" 
