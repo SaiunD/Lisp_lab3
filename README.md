@@ -24,51 +24,42 @@
 
 ## Лістинг функції з використанням конструктивного підходу
 ```lisp
-CL-USER> (defun recur (c lst res1 i k L R)
-           (if lst
-               (let* ((cond1 (< i L))
-                      (cond2 (< c (car lst)))
-                      (new-c (if (or cond1 cond2) (car lst) c))
-                      (new-put (if (or cond1 cond2) c (car lst)))
-                      (new-k (if (or cond1 cond2) k i)))
-                 (multiple-value-bind (znach acc bind-k bind-R) (recur new-c (cdr lst) (cons new-put res1) (1+ i) new-k L R)
-                   (if res1
-                       (let* ((cond3 (<= (car res1) znach))
-                              (cond4 (> i R))
-                              (new-znach (if (or cond3 cond4) (car res1) znach))
-                              (new-acc-put (if (or cond3 cond4) znach (car res1)))
-                              (new-k-r (if cond3 bind-k (1- i))))
-                         (values new-znach (cons new-acc-put acc) new-k-r bind-R))
-                       (values nil (cons znach acc) bind-k bind-R)))
-                 )
-               (let* ((cond5 (> c (car res1)))
-                      (new-z (if cond5 (car res1) c))
-                      (new-acc-p (if cond5 c (car res1))))
-                 (values new-z (list new-acc-p) k k))))
-RECUR
-CL-USER> (defun shaker-sort-inner (lst k L R)
+CL-USER> (defun shake-it (lst R i k)
+           (if (and lst (cdr lst))
+               (if (< i R)
+                   (let* ((z1 (car lst))
+                          (z2 (car (cdr lst)))
+                          (cond1 (> z1 z2))
+                          (z (if cond1 z2 z1))
+                          (new-lst (if cond1 (cons z1 (cdr (cdr lst))) (cdr lst)))
+                          (new-k (if cond1 i k)))
+                     (multiple-value-bind (temp-lst bind-k bind-R) (shake-it new-lst R (1+ i) new-k)
+                       (if (> i bind-R)
+                           (values (cons z temp-lst) bind-k bind-R)
+                           (let* ((cond2 (and temp-lst (<= z (car temp-lst))))
+                                  (back-k (if cond2 bind-k i)))
+                             (if cond2
+                                 (values (cons z temp-lst) back-k bind-R)
+                                 (values (cons (car temp-lst) (cons z (cdr temp-lst))) back-k bind-R))))))
+                   (values lst k k))
+               (values lst k k)))
+
+SHAKE-IT
+CL-USER> (defun left-side-apart (lst L &optional (i 0))
+           (if (< i L)
+               (multiple-value-bind (left rest) (left-side-apart (cdr lst) L (1+ i))
+                 (values (cons (car lst) left) rest))
+               (values nil lst)))
+LEFT-SIDE-APART
+CL-USER> (defun shaker-sort-inner (lst L R k)
            (if (< L R)
-               (multiple-value-bind (z new-lst new-k new-R) (recur (car lst) (cdr lst) nil 0 k L R)
-                 (shaker-sort-inner new-lst new-k (1+ new-k) new-R))
+               (multiple-value-bind (left-side right-side) (left-side-apart lst L)
+                 (multiple-value-bind (res res-k res-R) (shake-it right-side R L k)
+                   (shaker-sort-inner (append left-side res) (1+ res-k) res-R res-k)))
                lst))
-; in: DEFUN SHAKER-SORT-INNER
-;     (MULTIPLE-VALUE-BIND (Z NEW-LST NEW-K NEW-R)
-;         (RECUR (CAR LST) (CDR LST) NIL 0 K L R)
-;       (SHAKER-SORT-INNER NEW-LST NEW-K (1+ NEW-K) NEW-R))
-; --> MULTIPLE-VALUE-CALL 
-; ==>
-;   #'(LAMBDA (&OPTIONAL (Z) (NEW-LST) (NEW-K) (NEW-R) &REST #:G0)
-;       (DECLARE (IGNORE #:G0))
-;       (SHAKER-SORT-INNER NEW-LST NEW-K (1+ NEW-K) NEW-R))
-; 
-; caught STYLE-WARNING:
-;   The variable Z is defined but never used.
-; 
-; compilation unit finished
-;   caught 1 STYLE-WARNING condition
 SHAKER-SORT-INNER
 CL-USER> (defun shaker-sort (lst)
-           (shaker-sort-inner lst 0 0 (1- (length lst))))
+           (shaker-sort-inner lst 0 (1- (length lst)) 0))
 SHAKER-SORT
 ```
 
